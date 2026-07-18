@@ -2,91 +2,77 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>YouTube AR на стіні</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube AR</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <style>
+        body { margin: 0; overflow: hidden; }
         #ui-container {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999;
-            background: rgba(0, 0, 0, 0.9); padding: 15px; border-radius: 12px;
-            display: flex; flex-direction: column; gap: 10px; width: 90%; max-width: 400px;
-            color: white; font-family: sans-serif;
+            background: rgba(0, 0, 0, 0.8); padding: 15px; border-radius: 12px; color: white;
+            width: 90%; max-width: 300px; text-align: center;
         }
-        .slider-group { display: flex; flex-direction: column; gap: 2px; }
-        .slider-label { font-size: 12px; display: flex; justify-content: space-between; }
-        button { padding: 10px; border-radius: 6px; border: none; background: #ff0000; color: white; font-weight: bold; }
+        /* Це вікно, де буде відео */
+        #video-overlay {
+            position: absolute;
+            display: none;
+            width: 300px; height: 170px;
+            z-index: 10000;
+            border: 2px solid white;
+        }
     </style>
 </head>
-<body style="margin: 0; overflow: hidden;">
+<body>
 
     <div id="ui-container">
-        <input type="text" id="youtube-url" placeholder="Встав посилання на YouTube..." style="padding:10px;">
-        <button onclick="updateVideo()">Закріпити відео</button>
-        <button onclick="playVideo()" style="background:#333;">Натисни, щоб увімкнути звук/відео</button>
-        
-        <div class="slider-group">
-            <div class="slider-label"><span>Відстань:</span><span id="dist-val">3м</span></div>
-            <input type="range" id="distance-slider" min="1" max="10" step="0.5" value="3" oninput="adjustScreen()">
-        </div>
-        <div class="slider-group">
-            <div class="slider-label"><span>Висота (вертикаль):</span><span id="height-val">1.6м</span></div>
-            <input type="range" id="height-slider" min="0" max="3" step="0.1" value="1.6" oninput="adjustScreen()">
-        </div>
-        <div class="slider-group">
-            <div class="slider-label"><span>Розмір:</span><span id="size-val">1.0x</span></div>
-            <input type="range" id="size-slider" min="0.3" max="3" step="0.1" value="1" oninput="adjustScreen()">
-        </div>
+        <input type="text" id="youtube-url" placeholder="Посилання YouTube" style="width:100%; padding:8px;">
+        <button onclick="setupVideo()" style="width:100%; margin-top:5px; background:red; color:white; border:none; padding:10px;">Закріпити відео</button>
     </div>
 
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false">
-        <a-entity id="video-wall" rotation="0 0 0">
-            <!-- Використовуємо iframe для відео, бо це єдиний надійний спосіб -->
-            <a-entity id="video-screen" geometry="primitive: plane; width: 3; height: 1.7" position="0 1.6 -3" material="shader: flat; color: #111">
-                <a-text value="Встав посилання" align="center" color="#fff" width="4"></a-text>
-            </a-entity>
-        </a-entity>
-        
-        <!-- Зменшена чутливість (touchSensitivity) -->
-        <a-entity camera look-controls="touchSensitivity: 0.4; magicWindowTrackingEnabled: true;"></a-entity>
+    <!-- Вікно для відео -->
+    <div id="video-overlay">
+        <iframe id="yt-player" width="100%" height="100%" src="" frameborder="0"></iframe>
+    </div>
+
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+        <!-- Маркер-мішень, який ми будемо відстежувати -->
+        <a-entity id="anchor" position="0 1.6 -3"></a-entity>
+        <a-camera look-controls></a-camera>
     </a-scene>
 
     <script>
-        function updateVideo() {
-            const urlInput = document.getElementById('youtube-url').value;
-            const videoId = urlInput.split('v=')[1]?.split('&')[0] || urlInput.split('/').pop();
+        function setupVideo() {
+            const url = document.getElementById('youtube-url').value;
+            const videoId = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
             if (!videoId) return alert('Помилка посилання');
-            
-            // Замінюємо 3D-площину на iframe (відео)
-            const videoScreen = document.getElementById('video-screen');
-            videoScreen.innerHTML = `<iframe id="yt-player" width="100%" height="100%" src="https://www.youtube.com/embed/${videoId}?autoplay=1" frameborder="0" allow="autoplay"></iframe>`;
-            
-            const cameraEl = document.querySelector('[camera]');
-            const wallEl = document.getElementById('video-wall');
-            wallEl.setAttribute('rotation', `0 ${cameraEl.getAttribute('rotation').y} 0`);
-        }
 
-        function playVideo() {
+            const overlay = document.getElementById('video-overlay');
             const player = document.getElementById('yt-player');
-            if (player) {
-                // Це примусовий запуск через повідомлення iframe (якщо сайт дозволяє)
-                player.src += "&autoplay=1";
-            }
+            player.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+            overlay.style.display = 'block';
         }
 
-        function adjustScreen() {
-            const dist = document.getElementById('distance-slider').value;
-            const height = document.getElementById('height-slider').value;
-            const size = document.getElementById('size-slider').value;
+        // Ця функція постійно прив'язує вікно з відео до 3D-координат
+        function animate() {
+            const anchor = document.querySelector('#anchor');
+            const overlay = document.getElementById('video-overlay');
             
-            document.getElementById('dist-val').innerText = dist + 'м';
-            document.getElementById('height-val').innerText = height + 'м';
-            document.getElementById('size-val').innerText = size + 'x';
+            // Отримуємо положення маркера на екрані
+            const vector = new THREE.Vector3();
+            anchor.object3D.getWorldPosition(vector);
+            vector.project(document.querySelector('a-scene').camera);
             
-            const screen = document.getElementById('video-screen');
-            screen.setAttribute('position', `0 ${height} -${dist}`);
-            screen.setAttribute('scale', `${size} ${size} ${size}`);
+            // Перетворюємо 3D координати в 2D (на екран)
+            const x = (vector.x + 1) / 2 * window.innerWidth - 150;
+            const y = -(vector.y - 1) / 2 * window.innerHeight - 85;
+            
+            overlay.style.left = x + 'px';
+            overlay.style.top = y + 'px';
+            
+            requestAnimationFrame(animate);
         }
+        animate();
     </script>
 </body>
 </html>
