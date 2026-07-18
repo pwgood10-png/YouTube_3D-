@@ -8,142 +8,84 @@
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <style>
         #ui-container {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 9999;
-            background: rgba(0, 0, 0, 0.85);
-            padding: 15px;
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            width: 90%;
-            max-width: 400px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            font-family: sans-serif;
-            color: white;
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999;
+            background: rgba(0, 0, 0, 0.9); padding: 15px; border-radius: 12px;
+            display: flex; flex-direction: column; gap: 10px; width: 90%; max-width: 400px;
+            color: white; font-family: sans-serif;
         }
-        input[type="text"], button {
-            padding: 12px;
-            border-radius: 6px;
-            border: none;
-            font-size: 16px;
-        }
-        input[type="text"] {
-            background: #222;
-            color: white;
-        }
-        button {
-            background: #ff0000;
-            color: white;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .slider-group {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .slider-label {
-            font-size: 14px;
-            display: flex;
-            justify-content: space-between;
-        }
-        input[type="range"] {
-            width: 100%;
-            accent-color: #ff0000;
-        }
-        .instructions {
-            color: #aaa;
-            font-size: 11px;
-            text-align: center;
-            margin: 0;
-        }
+        .slider-group { display: flex; flex-direction: column; gap: 2px; }
+        .slider-label { font-size: 12px; display: flex; justify-content: space-between; }
+        button { padding: 10px; border-radius: 6px; border: none; background: #ff0000; color: white; font-weight: bold; }
     </style>
 </head>
 <body style="margin: 0; overflow: hidden;">
 
     <div id="ui-container">
-        <input type="text" id="youtube-url" placeholder="Встав посилання на YouTube...">
-        <button onclick="updateVideo()">Закріпити на стіні</button>
+        <input type="text" id="youtube-url" placeholder="Встав посилання на YouTube..." style="padding:10px;">
+        <button onclick="updateVideo()">Закріпити відео</button>
+        <button onclick="playVideo()" style="background:#333;">Натисни, щоб увімкнути звук/відео</button>
         
-        <!-- Налаштування відстані -->
         <div class="slider-group">
-            <div class="slider-label">
-                <span>Відстань до стіни:</span>
-                <span id="dist-val">3м</span>
-            </div>
+            <div class="slider-label"><span>Відстань:</span><span id="dist-val">3м</span></div>
             <input type="range" id="distance-slider" min="1" max="10" step="0.5" value="3" oninput="adjustScreen()">
         </div>
-
-        <!-- Налаштування розміру -->
         <div class="slider-group">
-            <div class="slider-label">
-                <span>Розмір екрану:</span>
-                <span id="size-val">1.0x</span>
-            </div>
+            <div class="slider-label"><span>Висота (вертикаль):</span><span id="height-val">1.6м</span></div>
+            <input type="range" id="height-slider" min="0" max="3" step="0.1" value="1.6" oninput="adjustScreen()">
+        </div>
+        <div class="slider-group">
+            <div class="slider-label"><span>Розмір:</span><span id="size-val">1.0x</span></div>
             <input type="range" id="size-slider" min="0.3" max="3" step="0.1" value="1" oninput="adjustScreen()">
         </div>
-
-        <p class="instructions">Поверни телефон, встав посилання та тисни кнопку. Повзунками вище регулюй екран.</p>
     </div>
 
     <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false">
-        <!-- Головний контейнер «стіни», який ми крутимо за компасом -->
-        <a-entity id="video-wall" position="0 0 0" rotation="0 0 0">
-            <!-- Сама площина екрану. Її Z-координата — це відстань від нас -->
-            <a-plane id="video-screen" width="3" height="1.7" position="0 1.6 -3" color="#111" material="shader: flat;">
-                <a-text value="Тут з'явиться відео" align="center" color="#fff" width="4"></a-text>
-            </a-plane>
+        <a-entity id="video-wall" rotation="0 0 0">
+            <!-- Використовуємо iframe для відео, бо це єдиний надійний спосіб -->
+            <a-entity id="video-screen" geometry="primitive: plane; width: 3; height: 1.7" position="0 1.6 -3" material="shader: flat; color: #111">
+                <a-text value="Встав посилання" align="center" color="#fff" width="4"></a-text>
+            </a-entity>
         </a-entity>
-        <a-entity camera look-controls></a-entity>
+        
+        <!-- Зменшена чутливість (touchSensitivity) -->
+        <a-entity camera look-controls="touchSensitivity: 0.4; magicWindowTrackingEnabled: true;"></a-entity>
     </a-scene>
 
     <script>
-        function extractVideoId(url) {
-            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-            const match = url.match(regExp);
-            return (match && match[2].length === 11) ? match[2] : null;
-        }
-
         function updateVideo() {
             const urlInput = document.getElementById('youtube-url').value;
-            const videoId = extractVideoId(urlInput);
-            if (!videoId) {
-                alert('Будь ласка, встав коректне посилання на YouTube.');
-                return;
-            }
-            const videoScreen = document.getElementById('video-screen');
-            videoScreen.innerHTML = '';
-            videoScreen.setAttribute('color', '#ff0000');
+            const videoId = urlInput.split('v=')[1]?.split('&')[0] || urlInput.split('/').pop();
+            if (!videoId) return alert('Помилка посилання');
             
-            // Фіксуємо напрямок стіни куди дивиться камера
+            // Замінюємо 3D-площину на iframe (відео)
+            const videoScreen = document.getElementById('video-screen');
+            videoScreen.innerHTML = `<iframe id="yt-player" width="100%" height="100%" src="https://www.youtube.com/embed/${videoId}?autoplay=1" frameborder="0" allow="autoplay"></iframe>`;
+            
             const cameraEl = document.querySelector('[camera]');
             const wallEl = document.getElementById('video-wall');
-            const currentRotation = cameraEl.getAttribute('rotation');
-            wallEl.setAttribute('rotation', `0 ${currentRotation.y} 0`);
-            
-            // Оновлюємо позицію та розмір згідно з повзунками
-            adjustScreen();
+            wallEl.setAttribute('rotation', `0 ${cameraEl.getAttribute('rotation').y} 0`);
+        }
+
+        function playVideo() {
+            const player = document.getElementById('yt-player');
+            if (player) {
+                // Це примусовий запуск через повідомлення iframe (якщо сайт дозволяє)
+                player.src += "&autoplay=1";
+            }
         }
 
         function adjustScreen() {
-            const distance = document.getElementById('distance-slider').value;
+            const dist = document.getElementById('distance-slider').value;
+            const height = document.getElementById('height-slider').value;
             const size = document.getElementById('size-slider').value;
             
-            // Оновлюємо текст біля повзунків
-            document.getElementById('dist-val').innerText = distance + 'м';
+            document.getElementById('dist-val').innerText = dist + 'м';
+            document.getElementById('height-val').innerText = height + 'м';
             document.getElementById('size-val').innerText = size + 'x';
             
-            const videoScreen = document.getElementById('video-screen');
-            
-            // Змінюємо відстань (від'ємне значення по осі Z віддаляє об'єкт вперед)
-            videoScreen.setAttribute('position', `0 1.6 -${distance}`);
-            
-            // Змінюємо масштаб (розмір екрану) за всіма трьома осями
-            videoScreen.setAttribute('scale', `${size} ${size} ${size}`);
+            const screen = document.getElementById('video-screen');
+            screen.setAttribute('position', `0 ${height} -${dist}`);
+            screen.setAttribute('scale', `${size} ${size} ${size}`);
         }
     </script>
 </body>
